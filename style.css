@@ -268,3 +268,7 @@ button {
 .popup--visible {
   opacity: 1;
 }
+
+.workout-id {
+  display: none;
+}

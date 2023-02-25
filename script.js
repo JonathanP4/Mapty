@@ -81,7 +81,10 @@ class App {
       // Get data from localStorage
       this._getLocalStorage()
       // Display marker
-      form.addEventListener('submit', this._newWorkout.bind(this))
+      form.addEventListener('submit', (e) => {
+         this._newWorkout(e)
+         console.log(this.#mapE.latlng);
+      })
       // Toogle fields
       inputType.addEventListener('change', this._toggleElevationField)
       // Clear map
@@ -92,14 +95,8 @@ class App {
          if (!e.target.classList.contains('btn--delete'))
             this._moveToPopup(e);
          // Edit workout
-         if (e.target.classList.contains('btn--edit')) {
-            const index = this._getIndex(e)
-            const el = JSON.parse((localStorage.getItem('workouts')))
-
-            this._showForm()
-            this._newWorkout(form, el[index].coords)
-            // console.log(el[index]);
-         };
+         if (e.target.classList.contains('btn--edit'))
+            this._editWorkout(e);
          // Delete workout
          if (e.target.classList.contains('btn--delete'))
             this.deleteWorkout(e);
@@ -140,8 +137,11 @@ class App {
       })
    }
 
-   _showForm(e) {
+   _showForm(e, coords = '') {
       this.#mapE = e
+      if (e.latlng === undefined) this.#mapE.latlng = coords
+
+      console.log(this.#mapE);
       form.classList.remove('hidden')
       inputDistance.focus()
    }
@@ -159,7 +159,8 @@ class App {
       inputElevation.closest('.form__row').classList.toggle('form__row--hidden')
       inputCadence.closest('.form__row').classList.toggle('form__row--hidden')
    }
-   _newWorkout(e, coords = this.#mapE.latlng) {
+   _newWorkout(e) {
+      console.log(this.#mapE.latlng);
       e.preventDefault()
       //Check if data is valid
       const validInputs = (...inputs) => inputs.every(inp => Number.isFinite(inp))
@@ -169,7 +170,7 @@ class App {
       const type = inputType.value
       const distance = +inputDistance.value
       const duration = +inputDuration.value
-      const { lat, lng } = coords
+      const { lat, lng } = this.#mapE.latlng
       let workout;
 
       //If is running create running object
@@ -260,6 +261,7 @@ class App {
             <span class="workout__icon">⏱</span>
             <span class="workout__value duration">${workout.duration}</span>
             <span class="workout__unit">min</span>
+            <span class="workout-id" data-id="${workout.id}"></span>
          </div>`;
 
       if (workout.type === 'running') {
@@ -335,9 +337,11 @@ class App {
    deleteWorkout(e) {
       //get index of element to be deleted
       const curElIndex = this._getIndex(e)
+      console.log(curElIndex);
 
-      //Delete item from local storage + remove from form
-      this.#workouts.splice(curElIndex)
+      //Delete item from local storage + remove from containerWorkouts
+      this.#workouts.splice(curElIndex, 1)
+      console.log(this.#workouts);
       this._setLocalStorage()
 
       //remove marker
@@ -345,19 +349,40 @@ class App {
       if (e.target.closest('.workout')) e.target.closest('.workout').remove()
    }
    sortWorkouts(val) {
-      const data = JSON.parse(localStorage.getItem('workouts'))
-      const sortData = data
+      const sortData = this.#workouts
          .slice()
          .sort((a, b) => b.duration - a.duration);
-
       document.querySelectorAll('.workout').forEach(el => el.remove())
+      if (!val) this.#workouts.forEach(el => this._renderWorkout(el));
 
-      if (!val) {
-         data.forEach(el => this._renderWorkout(el))
-         return
+      if (val) sortData.forEach(el => this._renderWorkout(el));
+   }
+   _editWorkout(e) {
+      const elID = e.target.parentNode.dataset.id
+      let index;
+      this.#workouts.forEach((el, i) => {
+         if (el.id === elID) index = i
+      })
+      class Coords {
+         constructor(lat, lng) {
+            this.lat = lat
+            this.lng = lng
+         }
       }
+      const [lat, lng] = this.#workouts[index].coords
 
-      sortData.forEach(el => this._renderWorkout(el))
+      // Initialize replacement
+      this.#workouts.splice(index, 1)
+      this._setLocalStorage()
+
+      // Copy coords of edited obj
+      const coord = new Coords(lat, lng)
+
+      // Remove Item + create new workout based of edited
+      this._showForm(e, coord)
+      e.target.parentNode.remove()
+      this._removeItems(index, false)
+
    }
 }
 const app = new App()
